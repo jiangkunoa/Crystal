@@ -361,4 +361,12 @@ MigrationBackup/
 
 # Fody - auto-generated XML schema
 FodyWeavers.xsd
+
+# Build directory
 /Build
+
+# Claude Code files
+.claude/
+
+# JetBrains IDE files
+.idea/
