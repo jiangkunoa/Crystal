@@ -31,7 +31,7 @@ Key technologies:
 ## Build and Development Commands
 
 ### Prerequisites
-- Visual Studio 2022 or newer with .NET 8.0 SDK
+- Visual Studio 24 or newer with .NET 8.0 SDK
 - Required NuGet packages will be restored automatically
 
 ### Building the Project
@@ -81,6 +81,28 @@ The server uses multiple log types:
 
 Logs are written to the Logs/ directory with daily rotation.
 
+### Command Line Interface
+The cross-platform Server.Core includes a comprehensive command-line interface with the following commands:
+
+Available commands:
+- `help` - Show help message with all available commands
+- `status` - Show server status and statistics including uptime, player count, and performance metrics
+- `start` - Start the server (if stopped)
+- `stop` - Stop the server (if running)
+- `reboot` - Reboot the server
+- `players` - List all online players with their details
+- `guilds` - List all guilds with leader and member information
+- `broadcast <message>` - Broadcast a message to all online players
+- `kick <name>` - Kick a player by name
+- `ban <name>` - Ban a player by name (IP ban)
+- `unban <name>` - Unban a player by name
+- `clearbans` - Clear all banned IP addresses
+- `maps` - List all loaded maps with size and player count
+- `items` - Show item statistics
+- `monsters` - Show monster statistics
+- `save` - Save all server data to disk
+- `quit` or `exit` - Stop server and exit
+
 ### Common Development Tasks
 1. Building requires all projects in the solution to compile successfully
 2. Client and Server share data structures through the Shared project
@@ -92,6 +114,7 @@ Logs are written to the Logs/ directory with daily rotation.
 - Client/: Game client implementation with forms and rendering
 - Server/: Original server implementation with Windows Forms UI
 - Server.Core/: Cross-platform server implementation (new)
+- Server.Core/Commands/: Command-line interface commands
 - Shared/: Common data structures and network protocols
 - LibraryEditor/: Tools for editing game data files
 - Build/: Output directory for compiled binaries

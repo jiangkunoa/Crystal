@@ -3,11 +3,18 @@ using System.Reflection;
 using Server.MirEnvir;
 using Server.Library.Utils;
 using Server;
+using Server.Core.Commands;
+using System.Collections.Concurrent;
 
 namespace Server.Core
 {
     class Program
     {
+        private static Envir _envir;
+        private static bool _running = true;
+        private static ConsoleCommands _commands;
+        private static readonly ConcurrentQueue<string> _commandQueue = new ConcurrentQueue<string>();
+
         /// <summary>
         /// The main entry point for the cross-platform server application.
         /// </summary>
@@ -31,7 +38,10 @@ namespace Server.Core
                 Console.WriteLine("Server settings loaded successfully.");
 
                 // Start the server environment
-                var envir = Envir.Main;
+                _envir = Envir.Main;
+
+                // Initialize commands
+                _commands = new ConsoleCommands(_envir);
 
                 Console.WriteLine("Initializing server environment...");
                 Console.WriteLine("Loading database...");
@@ -50,31 +60,28 @@ namespace Server.Core
 
                 // Start the server
                 Console.WriteLine("Starting server...");
-                envir.Start();
+                _envir.Start();
 
                 Console.WriteLine("Server started successfully.");
-                Console.WriteLine("Press Ctrl+C to stop the server.");
+                Console.WriteLine("Type 'help' for available commands or 'quit' to stop the server.");
 
                 // Display some server info
-                DisplayServerInfo();
+                _commands.ShowStatus();
 
-                // Wait for shutdown signal
-                var tcs = new TaskCompletionSource<bool>();
-                Console.CancelKeyPress += (sender, e) =>
+                // Start background tasks
+                _ = ProcessMessages();
+                _ = ProcessConsoleInput();
+                _ = DisplayStatsPeriodically();
+
+                // Wait for shutdown
+                while (_running)
                 {
-                    e.Cancel = true;
-                    tcs.TrySetResult(true);
-                };
-
-                // Start message processing and stats display
-                var messageTask = ProcessMessages();
-                var statsTask = DisplayStatsPeriodically(envir, tcs.Task);
-
-                await tcs.Task;
+                    await Task.Delay(100);
+                }
 
                 Console.WriteLine("Stopping server...");
                 // Stop the server
-                envir.Stop();
+                _envir.Stop();
                 Settings.Save();
                 Console.WriteLine("Server stopped.");
             }
@@ -86,21 +93,30 @@ namespace Server.Core
             }
         }
 
-        static void DisplayServerInfo()
+        static async Task ProcessConsoleInput()
         {
-            Console.WriteLine($"Version path: {Settings.VersionPath}");
-            Console.WriteLine($"Check version: {Settings.CheckVersion}");
-            Console.WriteLine($"Multithreaded: {Settings.Multithreaded}");
-            Console.WriteLine($"Thread limit: {Settings.ThreadLimit}");
-            Console.WriteLine($"IP Address: {Settings.IPAddress}");
-            Console.WriteLine($"Port: {Settings.Port}");
+            while (_running)
+            {
+                var input = Console.ReadLine();
+                if (!string.IsNullOrWhiteSpace(input))
+                {
+                    _commandQueue.Enqueue(input.Trim());
+                }
+                await Task.Delay(10);
+            }
         }
 
         static async Task ProcessMessages()
         {
-            while (true)
+            while (_running)
             {
                 await Task.Delay(100); // Check for messages every 100ms
+
+                // Process commands
+                while (_commandQueue.TryDequeue(out var command))
+                {
+                    await ProcessCommand(command);
+                }
 
                 // Process regular messages
                 while (!MessageQueue.Instance.MessageLog.IsEmpty)
@@ -137,16 +153,110 @@ namespace Server.Core
             }
         }
 
-        static async Task DisplayStatsPeriodically(Envir envir, Task shutdownTask)
+        static async Task ProcessCommand(string input)
         {
-            while (!shutdownTask.IsCompleted)
+            var parts = input.Split(' ', StringSplitOptions.RemoveEmptyEntries);
+            if (parts.Length == 0) return;
+
+            var command = parts[0].ToLower();
+            var args = parts.Length > 1 ? parts.Skip(1).ToArray() : Array.Empty<string>();
+
+            switch (command)
             {
-                await Task.Delay(5000); // Update every 5 seconds
-                if (envir.Running)
+                case "help":
+                    _commands.ShowHelp();
+                    break;
+                case "status":
+                    _commands.ShowStatus();
+                    break;
+                case "start":
+                    if (!_envir.Running)
+                    {
+                        _envir.Start();
+                        Console.WriteLine("Server started.");
+                    }
+                    else
+                    {
+                        Console.WriteLine("Server is already running.");
+                    }
+                    break;
+                case "stop":
+                    if (_envir.Running)
+                    {
+                        _envir.Stop();
+                        Console.WriteLine("Server stopped.");
+                    }
+                    else
+                    {
+                        Console.WriteLine("Server is not running.");
+                    }
+                    break;
+                case "reboot":
+                    Console.WriteLine("Rebooting server...");
+                    _envir.Reboot();
+                    break;
+                case "players":
+                    _commands.ListPlayers();
+                    break;
+                case "guilds":
+                    _commands.ListGuilds();
+                    break;
+                case "broadcast":
+                    _commands.BroadcastMessage(string.Join(" ", args));
+                    break;
+                case "kick":
+                    if (args.Length > 0)
+                        _commands.KickPlayer(args[0]);
+                    else
+                        Console.WriteLine("Usage: kick <player name>");
+                    break;
+                case "ban":
+                    if (args.Length > 0)
+                        _commands.BanPlayer(args[0]);
+                    else
+                        Console.WriteLine("Usage: ban <player name>");
+                    break;
+                case "unban":
+                    if (args.Length > 0)
+                        _commands.UnbanPlayer(args[0]);
+                    else
+                        Console.WriteLine("Usage: unban <player name>");
+                    break;
+                case "clearbans":
+                    _commands.ClearBans();
+                    break;
+                case "maps":
+                    _commands.ListMaps();
+                    break;
+                case "items":
+                    _commands.ShowItemStats();
+                    break;
+                case "monsters":
+                    _commands.ShowMonsterStats();
+                    break;
+                case "save":
+                    _commands.SaveData();
+                    break;
+                case "quit":
+                case "exit":
+                    _running = false;
+                    break;
+                default:
+                    Console.WriteLine($"Unknown command: {command}. Type 'help' for available commands.");
+                    break;
+            }
+        }
+
+        static async Task DisplayStatsPeriodically()
+        {
+            while (_running)
+            {
+                await Task.Delay(30000); // Update every 30 seconds
+                if (_envir.Running)
                 {
-                    Console.WriteLine($"[Stats] Players: {envir.Players.Count}, " +
-                                    $"Monsters: {envir.MonsterCount}, " +
-                                    $"Connections: {envir.Connections.Count}");
+                    Console.WriteLine($"[Stats] Players: {_envir.Players.Count}, " +
+                                    $"Monsters: {_envir.MonsterCount}, " +
+                                    $"Connections: {_envir.Connections.Count}");
                 }
             }
         }
