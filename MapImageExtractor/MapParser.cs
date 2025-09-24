@@ -112,38 +112,41 @@ namespace MapImageExtractor
                     };
                     cellInfos.Add(cellInfo);
 
-                    // Add image info for back tiles
-                    if (cell.BackIndex >= 0 && cell.BackImage > 0)
+                    // Add image info for back tiles - apply mask
+                    int backImageIndex = (cell.BackImage & 0x1FFFFFFF) - 1;
+                    if (cell.BackIndex >= 0 && backImageIndex >= 0)
                     {
                         string libraryPath = GetLibraryPath(cell.BackIndex, 0); // 0 for back tiles
-                        string key = $"{libraryPath}_{cell.BackImage}";
+                        string key = $"{libraryPath}_{backImageIndex}";
                         if (!addedIndices.Contains(key))
                         {
-                            AddImageInfo(imageInfos, cell.BackImage, libraryPath, dataPath);
+                            AddImageInfo(imageInfos, backImageIndex, libraryPath, dataPath);
                             addedIndices.Add(key);
                         }
                     }
 
                     // Add image info for middle tiles
-                    if (cell.MiddleIndex >= 0 && cell.MiddleImage > 0)
+                    int middleImageIndex = cell.MiddleImage - 1;
+                    if (cell.MiddleIndex >= 0 && middleImageIndex >= 0)
                     {
                         string libraryPath = GetLibraryPath(cell.MiddleIndex, 1); // 1 for middle tiles
-                        string key = $"{libraryPath}_{cell.MiddleImage}";
+                        string key = $"{libraryPath}_{middleImageIndex}";
                         if (!addedIndices.Contains(key))
                         {
-                        AddImageInfo(imageInfos, cell.MiddleImage, libraryPath, dataPath);
+                        AddImageInfo(imageInfos, middleImageIndex, libraryPath, dataPath);
                             addedIndices.Add(key);
                         }
                     }
 
-                    // Add image info for front tiles
-                    if (cell.FrontIndex >= 0 && cell.FrontImage > 0)
+                    // Add image info for front tiles - apply mask
+                    int frontImageIndex = (cell.FrontImage & 0x7FFF) - 1;
+                    if (cell.FrontIndex >= 0 && frontImageIndex >= 0)
                     {
                         string libraryPath = GetLibraryPath(cell.FrontIndex, 2); // 2 for front tiles
-                        string key = $"{libraryPath}_{cell.FrontImage}";
+                        string key = $"{libraryPath}_{frontImageIndex}";
                         if (!addedIndices.Contains(key))
                         {
-                            AddImageInfo(imageInfos, cell.FrontImage, libraryPath, dataPath);
+                            AddImageInfo(imageInfos, frontImageIndex, libraryPath, dataPath);
                             addedIndices.Add(key);
                         }
                     }
@@ -151,7 +154,7 @@ namespace MapImageExtractor
             }
         }
 
-        private static string GetLibraryPath(short index, int layer)
+        public static string GetLibraryPath(short index, int layer)
         {
             // Determine library path based on index and layer
             // This is a simplified version - you may need to adjust based on your specific library structure

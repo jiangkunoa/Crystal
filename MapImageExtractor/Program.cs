@@ -179,6 +179,9 @@ namespace MapImageExtractor
                 // Parse map with cell information
                 var (imageInfos, cellInfos, width, height) = MapParser.ParseMapFileWithCells(mapFilePath, dataDirectory);
 
+                Console.WriteLine($"Map dimensions: {width}x{height}");
+                Console.WriteLine($"Cell count: {cellInfos.Count}, Image count: {imageInfos.Count}");
+
                 Console.WriteLine($"Parse result - Width: {width}, Height: {height}, Cells: {cellInfos.Count}, Images: {imageInfos.Count}");
 
                 if (width <= 0 || height <= 0)
@@ -222,43 +225,122 @@ namespace MapImageExtractor
                 int mapWidth = width * cellWidth;
                 int mapHeight = height * cellHeight;
 
-                using (var fullMapBitmap = new Bitmap(mapWidth, mapHeight))
-                using (var graphics = Graphics.FromImage(fullMapBitmap))
+                // Check if the map size is too large and reduce it if necessary
+                const int maxDimension = 32767; // Maximum bitmap dimension
+                if (mapWidth > maxDimension || mapHeight > maxDimension)
                 {
-                    graphics.Clear(Color.Black);
+                    Console.WriteLine($"Map size ({mapWidth}x{mapHeight}) is too large, scaling down...");
+                    double scale = Math.Min((double)maxDimension / mapWidth, (double)maxDimension / mapHeight);
+                    mapWidth = (int)(mapWidth * scale);
+                    mapHeight = (int)(mapHeight * scale);
+                    Console.WriteLine($"Scaled map size: {mapWidth}x{mapHeight}");
+                }
 
-                    // Draw each cell in correct Z-order: Back -> Middle -> Front
-                    foreach (var cellInfo in cellInfos)
+                // Use MapReader to get proper cell info
+                var mapReader = new MapReader(mapFilePath);
+
+                try
+                {
+                    using (var fullMapBitmap = new Bitmap(mapWidth, mapHeight))
+                    using (var graphics = Graphics.FromImage(fullMapBitmap))
                     {
-                        // Draw back layer (background tiles)
-                        if (cellInfo.TileIndex > 0)
+                        graphics.Clear(Color.Black);
+
+                        // Draw each cell in correct Z-order: Back -> Middle -> Front
+                        // First draw all back tiles
+                        for (int y = 0; y < mapReader.Height; y++)
                         {
-                            string backLibraryPath = MapParser.GetLibraryPath((short)cellInfo.BackIndex, 0); // 0 for back tiles
-                            DrawCellImage(graphics, libraries, backLibraryPath, cellInfo.TileIndex,
-                                        cellInfo.X * cellWidth, cellInfo.Y * cellHeight, verbose);
+                            for (int x = 0; x < mapReader.Width; x++)
+                            {
+                                var cell = mapReader.MapCells[x, y];
+                                if ((cell.BackImage == 0) || (cell.BackIndex == -1)) continue;
+
+                                int index = (cell.BackImage & 0x1FFFFFFF) - 1;
+                                string backLibraryPath = MapParser.GetLibraryPath(cell.BackIndex, 0);
+                                string libKey = backLibraryPath.ToLower();
+
+                                if (libraries.ContainsKey(libKey))
+                                {
+                                    var library = libraries[libKey];
+                                    var image = library.GetImage(index);
+                                    if (image != null && image.Image != null)
+                                    {
+                                        // Calculate position with offset
+                                        int drawX = x * cellWidth + image.X;
+                                        int drawY = y * cellHeight + image.Y;
+                                        graphics.DrawImage(image.Image, drawX, drawY);
+                                    }
+                                }
+                            }
                         }
 
-                        // Draw middle layer (small objects)
-                        if (cellInfo.SmObjectIndex > 0)
+                        // Then draw all middle tiles
+                        for (int y = 0; y < mapReader.Height; y++)
                         {
-                            string middleLibraryPath = MapParser.GetLibraryPath((short)cellInfo.MiddleIndex, 1); // 1 for middle tiles
-                            DrawCellImage(graphics, libraries, middleLibraryPath, cellInfo.SmObjectIndex,
-                                        cellInfo.X * cellWidth, cellInfo.Y * cellHeight, verbose);
+                            for (int x = 0; x < mapReader.Width; x++)
+                            {
+                                var cell = mapReader.MapCells[x, y];
+                                int index = cell.MiddleImage - 1;
+
+                                if (index < 0 || cell.MiddleIndex == -1) continue;
+
+                                string middleLibraryPath = MapParser.GetLibraryPath(cell.MiddleIndex, 1);
+                                string libKey = middleLibraryPath.ToLower();
+
+                                if (libraries.ContainsKey(libKey))
+                                {
+                                    var library = libraries[libKey];
+                                    var image = library.GetImage(index);
+                                    if (image != null && image.Image != null)
+                                    {
+                                        // Calculate position with offset
+                                        int drawX = x * cellWidth + image.X;
+                                        int drawY = y * cellHeight + image.Y;
+                                        graphics.DrawImage(image.Image, drawX, drawY);
+                                    }
+                                }
+                            }
                         }
 
-                        // Draw front layer (objects including blue tiles)
-                        if (cellInfo.ObjectIndex > 0)
+                        // Finally draw all front tiles
+                        for (int y = 0; y < mapReader.Height; y++)
                         {
-                            string frontLibraryPath = MapParser.GetLibraryPath((short)cellInfo.FrontIndex, 2); // 2 for front tiles
-                            DrawCellImage(graphics, libraries, frontLibraryPath, cellInfo.ObjectIndex,
-                                        cellInfo.X * cellWidth, cellInfo.Y * cellHeight, verbose);
+                            for (int x = 0; x < mapReader.Width; x++)
+                            {
+                                var cell = mapReader.MapCells[x, y];
+                                int index = (cell.FrontImage & 0x7FFF) - 1;
+
+                                if (index == -1 || cell.FrontIndex == -1) continue;
+
+                                string frontLibraryPath = MapParser.GetLibraryPath(cell.FrontIndex, 2);
+                                string libKey = frontLibraryPath.ToLower();
+
+                                if (libraries.ContainsKey(libKey))
+                                {
+                                    var library = libraries[libKey];
+                                    var image = library.GetImage(index);
+                                    if (image != null && image.Image != null)
+                                    {
+                                        // Calculate position with offset
+                                        int drawX = x * cellWidth + image.X;
+                                        int drawY = y * cellHeight + image.Y;
+                                        graphics.DrawImage(image.Image, drawX, drawY);
+                                    }
+                                }
+                            }
                         }
+
+                        // Save full map image
+                        string fullMapPath = Path.Combine(outputPath, "full_map.png");
+                        fullMapBitmap.Save(fullMapPath, ImageFormat.Png);
+                        Console.WriteLine($"Full map image saved to: {fullMapPath}");
                     }
-
-                    // Save full map image
-                    string fullMapPath = Path.Combine(outputPath, "full_map.png");
-                    fullMapBitmap.Save(fullMapPath, ImageFormat.Png);
-                    Console.WriteLine($"Full map image saved to: {fullMapPath}");
+                }
+                catch (Exception ex)
+                {
+                    Console.WriteLine($"Error creating bitmap: {ex.Message}");
+                    // Try creating a smaller version
+                    CreateReducedMapImage(mapFilePath, dataDirectory, outputPath, libraries, verbose, mapReader, cellWidth, cellHeight);
                 }
             }
             catch (Exception ex)
@@ -295,17 +377,175 @@ namespace MapImageExtractor
             }
         }
 
+        static void CreateReducedMapImage(string mapFilePath, string dataDirectory, string outputPath, Dictionary<string, MLibrary> libraries, bool verbose, MapReader mapReader, int cellWidth, int cellHeight)
+        {
+            try
+            {
+                Console.WriteLine("Creating reduced map image...");
+
+                // Create a smaller bitmap (1/4 size)
+                int reducedWidth = mapReader.Width * cellWidth / 4;
+                int reducedHeight = mapReader.Height * cellHeight / 4;
+
+                using (var fullMapBitmap = new Bitmap(reducedWidth, reducedHeight))
+                using (var graphics = Graphics.FromImage(fullMapBitmap))
+                {
+                    graphics.Clear(Color.Black);
+                    graphics.InterpolationMode = System.Drawing.Drawing2D.InterpolationMode.NearestNeighbor;
+
+                    // Draw each cell in correct Z-order: Back -> Middle -> Front
+                    // First draw all back tiles
+                    for (int y = 0; y < mapReader.Height; y++)
+                    {
+                        for (int x = 0; x < mapReader.Width; x++)
+                        {
+                            var cell = mapReader.MapCells[x, y];
+                            if ((cell.BackImage == 0) || (cell.BackIndex == -1)) continue;
+
+                            int index = (cell.BackImage & 0x1FFFFFFF) - 1;
+                            string backLibraryPath = MapParser.GetLibraryPath(cell.BackIndex, 0);
+                            string libKey = backLibraryPath.ToLower();
+
+                            if (libraries.ContainsKey(libKey))
+                            {
+                                var library = libraries[libKey];
+                                var image = library.GetImage(index);
+                                if (image != null && image.Image != null)
+                                {
+                                    // Calculate position with offset and scale
+                                    int drawX = (x * cellWidth + image.X) / 4;
+                                    int drawY = (y * cellHeight + image.Y) / 4;
+                                    int scaledWidth = Math.Max(1, image.Image.Width / 4);
+                                    int scaledHeight = Math.Max(1, image.Image.Height / 4);
+                                    graphics.DrawImage(image.Image, drawX, drawY, scaledWidth, scaledHeight);
+                                }
+                            }
+                        }
+                    }
+
+                    // Then draw all middle tiles
+                    for (int y = 0; y < mapReader.Height; y++)
+                    {
+                        for (int x = 0; x < mapReader.Width; x++)
+                        {
+                            var cell = mapReader.MapCells[x, y];
+                            int index = cell.MiddleImage - 1;
+
+                            if (index < 0 || cell.MiddleIndex == -1) continue;
+
+                            string middleLibraryPath = MapParser.GetLibraryPath(cell.MiddleIndex, 1);
+                            string libKey = middleLibraryPath.ToLower();
+
+                            if (libraries.ContainsKey(libKey))
+                            {
+                                var library = libraries[libKey];
+                                var image = library.GetImage(index);
+                                if (image != null && image.Image != null)
+                                {
+                                    // Calculate position with offset and scale
+                                    int drawX = (x * cellWidth + image.X) / 4;
+                                    int drawY = (y * cellHeight + image.Y) / 4;
+                                    int scaledWidth = Math.Max(1, image.Image.Width / 4);
+                                    int scaledHeight = Math.Max(1, image.Image.Height / 4);
+                                    graphics.DrawImage(image.Image, drawX, drawY, scaledWidth, scaledHeight);
+                                }
+                            }
+                        }
+                    }
+
+                    // Finally draw all front tiles
+                    for (int y = 0; y < mapReader.Height; y++)
+                    {
+                        for (int x = 0; x < mapReader.Width; x++)
+                        {
+                            var cell = mapReader.MapCells[x, y];
+                            int index = (cell.FrontImage & 0x7FFF) - 1;
+
+                            if (index == -1 || cell.FrontIndex == -1) continue;
+
+                            string frontLibraryPath = MapParser.GetLibraryPath(cell.FrontIndex, 2);
+                            string libKey = frontLibraryPath.ToLower();
+
+                            if (libraries.ContainsKey(libKey))
+                            {
+                                var library = libraries[libKey];
+                                var image = library.GetImage(index);
+                                if (image != null && image.Image != null)
+                                {
+                                    // Calculate position with offset and scale
+                                    int drawX = (x * cellWidth + image.X) / 4;
+                                    int drawY = (y * cellHeight + image.Y) / 4;
+                                    int scaledWidth = Math.Max(1, image.Image.Width / 4);
+                                    int scaledHeight = Math.Max(1, image.Image.Height / 4);
+                                    graphics.DrawImage(image.Image, drawX, drawY, scaledWidth, scaledHeight);
+                                }
+                            }
+                        }
+                    }
+
+                    // Save full map image
+                    string fullMapPath = Path.Combine(outputPath, "full_map_reduced.png");
+                    fullMapBitmap.Save(fullMapPath, ImageFormat.Png);
+                    Console.WriteLine($"Reduced full map image saved to: {fullMapPath}");
+                }
+            }
+            catch (Exception ex)
+            {
+                Console.WriteLine($"Error creating reduced map image: {ex.Message}");
+            }
+        }
+
         static string FindMapFile(string mapDirectory, string mapName)
         {
-            // Try exact filename match first
-            string exactPath = Path.Combine(mapDirectory, mapName + ".map");
-            if (File.Exists(exactPath))
-                return exactPath;
+            try
+            {
+                Console.WriteLine($"Searching for map '{mapName}' in directory '{mapDirectory}'");
 
-            // Search for map files (case insensitive)
-            var mapFiles = Directory.GetFiles(mapDirectory, "*.map", SearchOption.AllDirectories);
-            return mapFiles.FirstOrDefault(f =>
-                Path.GetFileNameWithoutExtension(f).Equals(mapName, StringComparison.OrdinalIgnoreCase));
+                // If mapName already contains .map extension, don't add it again
+                string fileName = mapName.EndsWith(".map", StringComparison.OrdinalIgnoreCase) ?
+                    mapName : mapName + ".map";
+
+                // Try exact filename match first
+                string exactPath = Path.Combine(mapDirectory, fileName);
+                Console.WriteLine($"Checking exact path: {exactPath}");
+                if (File.Exists(exactPath))
+                {
+                    Console.WriteLine($"Found map at exact path: {exactPath}");
+                    return exactPath;
+                }
+
+                // Try with just the map name directly
+                if (File.Exists(mapName))
+                {
+                    Console.WriteLine($"Found map at direct path: {mapName}");
+                    return mapName;
+                }
+
+                // Search for map files (case insensitive)
+                if (Directory.Exists(mapDirectory))
+                {
+                    var mapFiles = Directory.GetFiles(mapDirectory, "*.map", SearchOption.AllDirectories);
+                    Console.WriteLine($"Found {mapFiles.Length} map files in directory");
+                    var result = mapFiles.FirstOrDefault(f =>
+                        Path.GetFileName(f).Equals(fileName, StringComparison.OrdinalIgnoreCase) ||
+                        Path.GetFileNameWithoutExtension(f).Equals(mapName, StringComparison.OrdinalIgnoreCase));
+                    if (result != null)
+                    {
+                        Console.WriteLine($"Found map by search: {result}");
+                        return result;
+                    }
+                }
+                else
+                {
+                    Console.WriteLine($"Map directory does not exist: {mapDirectory}");
+                }
+            }
+            catch (Exception ex)
+            {
+                Console.WriteLine($"Error searching for map file: {ex.Message}");
+            }
+
+            return null;
         }
     }
 }
