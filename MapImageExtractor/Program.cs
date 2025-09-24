@@ -248,10 +248,20 @@ namespace MapImageExtractor
 
                         // Draw each cell in correct Z-order: Back -> Middle -> Front
                         // First draw all back tiles (no size filtering for back tiles)
+                        // Apply same boundary conditions as Client project: x <= 0, y <= 0, and odd coordinates are skipped
                         for (int y = 0; y < mapReader.Height; y++)
                         {
+                            // Skip y <= 0 and odd y coordinates (like Client project)
+                            if (y <= 0 || y % 2 == 1) continue;
+
                             for (int x = 0; x < mapReader.Width; x++)
                             {
+                                // Skip x <= 0 and odd x coordinates (like Client project)
+                                if (x <= 0 || x % 2 == 1) continue;
+
+                                // Check bounds
+                                if (x >= mapReader.Width || y >= mapReader.Height) continue;
+
                                 var cell = mapReader.MapCells[x, y];
                                 if ((cell.BackImage == 0) || (cell.BackIndex == -1)) continue;
 
@@ -275,10 +285,20 @@ namespace MapImageExtractor
                         }
 
                         // Then draw all middle tiles with special handling for non-standard sizes
+                        // Apply same boundary conditions as Client project: x < 0, y <= 0
                         for (int y = 0; y < mapReader.Height; y++)
                         {
+                            // Skip y <= 0 (like Client project)
+                            if (y <= 0) continue;
+
                             for (int x = 0; x < mapReader.Width; x++)
                             {
+                                // Skip x < 0 (like Client project)
+                                if (x < 0) continue;
+
+                                // Check bounds
+                                if (x >= mapReader.Width || y >= mapReader.Height) continue;
+
                                 var cell = mapReader.MapCells[x, y];
                                 int index = cell.MiddleImage - 1;
 
@@ -317,10 +337,20 @@ namespace MapImageExtractor
                         }
 
                         // Finally draw all front tiles with special handling for non-standard sizes
+                        // Apply same boundary conditions as Client project: x < 0, y <= 0
                         for (int y = 0; y < mapReader.Height; y++)
                         {
+                            // Skip y <= 0 (like Client project)
+                            if (y <= 0) continue;
+
                             for (int x = 0; x < mapReader.Width; x++)
                             {
+                                // Skip x < 0 (like Client project)
+                                if (x < 0) continue;
+
+                                // Check bounds
+                                if (x >= mapReader.Width || y >= mapReader.Height) continue;
+
                                 var cell = mapReader.MapCells[x, y];
                                 int index = (cell.FrontImage & 0x7FFF) - 1;
 
@@ -423,10 +453,20 @@ namespace MapImageExtractor
 
                     // Draw each cell in correct Z-order: Back -> Middle -> Front
                     // First draw all back tiles (no size filtering for back tiles)
+                    // Apply same boundary conditions as Client project: x <= 0, y <= 0, and odd coordinates are skipped
                     for (int y = 0; y < mapReader.Height; y++)
                     {
+                        // Skip y <= 0 and odd y coordinates (like Client project)
+                        if (y <= 0 || y % 2 == 1) continue;
+
                         for (int x = 0; x < mapReader.Width; x++)
                         {
+                            // Skip x <= 0 and odd x coordinates (like Client project)
+                            if (x <= 0 || x % 2 == 1) continue;
+
+                            // Check bounds
+                            if (x >= mapReader.Width || y >= mapReader.Height) continue;
+
                             var cell = mapReader.MapCells[x, y];
                             if ((cell.BackImage == 0) || (cell.BackIndex == -1)) continue;
 
@@ -452,10 +492,20 @@ namespace MapImageExtractor
                     }
 
                     // Then draw all middle tiles with special handling for non-standard sizes
+                    // Apply same boundary conditions as Client project: x < 0, y <= 0
                     for (int y = 0; y < mapReader.Height; y++)
                     {
+                        // Skip y <= 0 (like Client project)
+                        if (y <= 0) continue;
+
                         for (int x = 0; x < mapReader.Width; x++)
                         {
+                            // Skip x < 0 (like Client project)
+                            if (x < 0) continue;
+
+                            // Check bounds
+                            if (x >= mapReader.Width || y >= mapReader.Height) continue;
+
                             var cell = mapReader.MapCells[x, y];
                             int index = cell.MiddleImage - 1;
 
@@ -496,10 +546,20 @@ namespace MapImageExtractor
                     }
 
                     // Finally draw all front tiles with special handling for non-standard sizes
+                    // Apply same boundary conditions as Client project: x < 0, y <= 0
                     for (int y = 0; y < mapReader.Height; y++)
                     {
+                        // Skip y <= 0 (like Client project)
+                        if (y <= 0) continue;
+
                         for (int x = 0; x < mapReader.Width; x++)
                         {
+                            // Skip x < 0 (like Client project)
+                            if (x < 0) continue;
+
+                            // Check bounds
+                            if (x >= mapReader.Width || y >= mapReader.Height) continue;
+
                             var cell = mapReader.MapCells[x, y];
                             int index = (cell.FrontImage & 0x7FFF) - 1;
 
