@@ -156,46 +156,94 @@ namespace MapImageExtractor
 
         public static string GetLibraryPath(short index, int layer)
         {
-            // Determine library path based on index and layer
-            // This is a simplified version - you may need to adjust based on your specific library structure
-            return index switch
+            // Recreate the exact library path mapping from Client project
+            if (index >= 0 && index < 100)
             {
-                >= 0 and < 100 => layer switch
+                // Wemade Mir2 (0-99)
+                return layer switch
                 {
-                    0 => "Map/WemadeMir2/Tiles",      // Back tiles
-                    1 => "Map/WemadeMir2/Smtiles",    // Middle tiles
-                    2 => "Map/WemadeMir2/Objects",    // Front tiles
+                    0 => "Map/WemadeMir2/Tiles",           // Back tiles
+                    1 => "Map/WemadeMir2/Smtiles",         // Middle tiles
+                    2 => index == 2 ? "Map/WemadeMir2/Objects" : $"Map/WemadeMir2/Objects{index - 1}", // Front tiles
                     _ => "Map/WemadeMir2/Tiles"
-                },
-                >= 100 and < 200 => layer switch
+                };
+            }
+            else if (index >= 100 && index < 200)
+            {
+                // Shanda Mir2 (100-199)
+                return layer switch
                 {
-                    0 => "Map/ShandaMir2/Tiles",
-                    1 => "Map/ShandaMir2/SmTiles",
-                    2 => "Map/ShandaMir2/Objects",
+                    0 => index == 100 ? "Map/ShandaMir2/Tiles" : $"Map/ShandaMir2/Tiles{index - 99}",     // Back tiles
+                    1 => index == 110 ? "Map/ShandaMir2/SmTiles" : $"Map/ShandaMir2/SmTiles{index - 109}", // Middle tiles
+                    2 => index >= 120 && index < 151 ? $"Map/ShandaMir2/Objects{index - 119}" : "Map/ShandaMir2/Objects", // Front tiles
                     _ => "Map/ShandaMir2/Tiles"
-                },
-                >= 200 and < 300 => layer switch
+                };
+            }
+            else if (index >= 200 && index < 299)
+            {
+                // Wemade Mir3 (200-299)
+                int stateGroup = (index - 200) / 15;
+                int stateIndex = (index - 200) % 15;
+                string[] mapStates = { "", "wood/", "sand/", "snow/", "forest/" };
+                string statePrefix = stateGroup < mapStates.Length ? mapStates[stateGroup] : "";
+
+                return stateIndex switch
                 {
-                    0 => "Map/WemadeMir3/Tilesc",
-                    1 => "Map/WemadeMir3/Smtilesc",
-                    2 => "Map/WemadeMir3/Objects",
-                    _ => "Map/WemadeMir3/Tilesc"
-                },
-                >= 300 and < 400 => layer switch
+                    0 => $"Map/WemadeMir3/{statePrefix}Tilesc",
+                    1 => $"Map/WemadeMir3/{statePrefix}Tiles30c",
+                    2 => $"Map/WemadeMir3/{statePrefix}Tiles5c",
+                    3 => $"Map/WemadeMir3/{statePrefix}Smtilesc",
+                    4 => $"Map/WemadeMir3/{statePrefix}Housesc",
+                    5 => $"Map/WemadeMir3/{statePrefix}Cliffsc",
+                    6 => $"Map/WemadeMir3/{statePrefix}Dungeonsc",
+                    7 => $"Map/WemadeMir3/{statePrefix}Innersc",
+                    8 => $"Map/WemadeMir3/{statePrefix}Furnituresc",
+                    9 => $"Map/WemadeMir3/{statePrefix}Wallsc",
+                    10 => $"Map/WemadeMir3/{statePrefix}smObjectsc",
+                    11 => $"Map/WemadeMir3/{statePrefix}Animationsc",
+                    12 => $"Map/WemadeMir3/{statePrefix}Object1c",
+                    13 => $"Map/WemadeMir3/{statePrefix}Object2c",
+                    _ => $"Map/WemadeMir3/{statePrefix}Tilesc"
+                };
+            }
+            else if (index >= 300 && index < 399)
+            {
+                // Shanda Mir3 (300-399)
+                int stateGroup = (index - 300) / 15;
+                int stateIndex = (index - 300) % 15;
+                string[] mapStates = { "", "wood", "sand", "snow", "forest" };
+                string stateSuffix = stateGroup < mapStates.Length ? mapStates[stateGroup] : "";
+
+                return stateIndex switch
                 {
-                    0 => "Map/ShandaMir3/Tiles",
-                    1 => "Map/ShandaMir3/SmTiles",
-                    2 => "Map/ShandaMir3/Objects",
-                    _ => "Map/ShandaMir3/Tiles"
-                },
-                _ => layer switch
+                    0 => $"Map/ShandaMir3/Tilesc{stateSuffix}",
+                    1 => $"Map/ShandaMir3/Tiles30c{stateSuffix}",
+                    2 => $"Map/ShandaMir3/Tiles5c{stateSuffix}",
+                    3 => $"Map/ShandaMir3/Smtilesc{stateSuffix}",
+                    4 => $"Map/ShandaMir3/Housesc{stateSuffix}",
+                    5 => $"Map/ShandaMir3/Cliffsc{stateSuffix}",
+                    6 => $"Map/ShandaMir3/Dungeonsc{stateSuffix}",
+                    7 => $"Map/ShandaMir3/Innersc{stateSuffix}",
+                    8 => $"Map/ShandaMir3/Furnituresc{stateSuffix}",
+                    9 => $"Map/ShandaMir3/Wallsc{stateSuffix}",
+                    10 => $"Map/ShandaMir3/smObjectsc{stateSuffix}",
+                    11 => $"Map/ShandaMir3/Animationsc{stateSuffix}",
+                    12 => $"Map/ShandaMir3/Object1c{stateSuffix}",
+                    13 => $"Map/ShandaMir3/Object2c{stateSuffix}",
+                    _ => $"Map/ShandaMir3/Tilesc{stateSuffix}"
+                };
+            }
+            else
+            {
+                // Default fallback
+                return layer switch
                 {
                     0 => "Map/WemadeMir2/Tiles",
                     1 => "Map/WemadeMir2/Smtiles",
                     2 => "Map/WemadeMir2/Objects",
                     _ => "Map/WemadeMir2/Tiles"
-                }
-            };
+                };
+            }
         }
 
         private static void ParseWemadeMir2Format(byte[] fileBytes, List<MapImageInfo> imageInfos, string dataPath)
