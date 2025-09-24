@@ -2,7 +2,7 @@ using System.Diagnostics;
 
 namespace MapImageExtractor
 {
-    class MapReader
+    public class MapReader
     {
         public int Width, Height;
         public CellInfo[,] MapCells;

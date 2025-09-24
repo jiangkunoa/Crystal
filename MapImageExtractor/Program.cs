@@ -144,8 +144,10 @@ namespace MapImageExtractor
                 // Create full map image if requested
                 if (outputFullMap)
                 {
-                    Console.WriteLine("Creating full map image...");
-                    CreateFullMapImage(mapFilePath, dataDirectory, outputPath, libraries, verbose);
+                    Console.WriteLine("Creating full map image using Client rendering logic...");
+                    // Use the new ClientMapRenderer for more accurate rendering
+                    var mapReader = new MapReader(mapFilePath);
+                    ClientMapRenderer.RenderFullMap(mapReader, libraries, outputPath, verbose);
                 }
 
                 // Save parameters file
