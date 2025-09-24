@@ -247,7 +247,7 @@ namespace MapImageExtractor
                         graphics.Clear(Color.Black);
 
                         // Draw each cell in correct Z-order: Back -> Middle -> Front
-                        // First draw all back tiles
+                        // First draw all back tiles (no size filtering for back tiles)
                         for (int y = 0; y < mapReader.Height; y++)
                         {
                             for (int x = 0; x < mapReader.Width; x++)
@@ -265,7 +265,7 @@ namespace MapImageExtractor
                                     var image = library.GetImage(index);
                                     if (image != null && image.Image != null)
                                     {
-                                        // Calculate position with offset
+                                        // Calculate position with offset - match Client project exactly
                                         int drawX = x * cellWidth + image.X;
                                         int drawY = y * cellHeight + image.Y;
                                         graphics.DrawImage(image.Image, drawX, drawY);
@@ -274,7 +274,7 @@ namespace MapImageExtractor
                             }
                         }
 
-                        // Then draw all middle tiles
+                        // Then draw all middle tiles with size filtering
                         for (int y = 0; y < mapReader.Height; y++)
                         {
                             for (int x = 0; x < mapReader.Width; x++)
@@ -293,7 +293,11 @@ namespace MapImageExtractor
                                     var image = library.GetImage(index);
                                     if (image != null && image.Image != null)
                                     {
-                                        // Calculate position with offset
+                                        // Apply size filtering like Client project
+                                        if ((image.Width != cellWidth || image.Height != cellHeight) &&
+                                            (image.Width != cellWidth * 2 || image.Height != cellHeight * 2)) continue;
+
+                                        // Calculate position with offset - match Client project exactly
                                         int drawX = x * cellWidth + image.X;
                                         int drawY = y * cellHeight + image.Y;
                                         graphics.DrawImage(image.Image, drawX, drawY);
@@ -302,7 +306,7 @@ namespace MapImageExtractor
                             }
                         }
 
-                        // Finally draw all front tiles
+                        // Finally draw all front tiles with size filtering
                         for (int y = 0; y < mapReader.Height; y++)
                         {
                             for (int x = 0; x < mapReader.Width; x++)
@@ -321,7 +325,11 @@ namespace MapImageExtractor
                                     var image = library.GetImage(index);
                                     if (image != null && image.Image != null)
                                     {
-                                        // Calculate position with offset
+                                        // Apply size filtering like Client project
+                                        if ((image.Width != cellWidth || image.Height != cellHeight) &&
+                                            (image.Width != cellWidth * 2 || image.Height != cellHeight * 2)) continue;
+
+                                        // Calculate position with offset - match Client project exactly
                                         int drawX = x * cellWidth + image.X;
                                         int drawY = y * cellHeight + image.Y;
                                         graphics.DrawImage(image.Image, drawX, drawY);
@@ -394,7 +402,7 @@ namespace MapImageExtractor
                     graphics.InterpolationMode = System.Drawing.Drawing2D.InterpolationMode.NearestNeighbor;
 
                     // Draw each cell in correct Z-order: Back -> Middle -> Front
-                    // First draw all back tiles
+                    // First draw all back tiles (no size filtering for back tiles)
                     for (int y = 0; y < mapReader.Height; y++)
                     {
                         for (int x = 0; x < mapReader.Width; x++)
@@ -423,7 +431,7 @@ namespace MapImageExtractor
                         }
                     }
 
-                    // Then draw all middle tiles
+                    // Then draw all middle tiles with size filtering
                     for (int y = 0; y < mapReader.Height; y++)
                     {
                         for (int x = 0; x < mapReader.Width; x++)
@@ -442,6 +450,10 @@ namespace MapImageExtractor
                                 var image = library.GetImage(index);
                                 if (image != null && image.Image != null)
                                 {
+                                    // Apply size filtering like Client project
+                                    if ((image.Width != cellWidth || image.Height != cellHeight) &&
+                                        (image.Width != cellWidth * 2 || image.Height != cellHeight * 2)) continue;
+
                                     // Calculate position with offset and scale
                                     int drawX = (x * cellWidth + image.X) / 4;
                                     int drawY = (y * cellHeight + image.Y) / 4;
@@ -453,7 +465,7 @@ namespace MapImageExtractor
                         }
                     }
 
-                    // Finally draw all front tiles
+                    // Finally draw all front tiles with size filtering
                     for (int y = 0; y < mapReader.Height; y++)
                     {
                         for (int x = 0; x < mapReader.Width; x++)
@@ -472,6 +484,10 @@ namespace MapImageExtractor
                                 var image = library.GetImage(index);
                                 if (image != null && image.Image != null)
                                 {
+                                    // Apply size filtering like Client project
+                                    if ((image.Width != cellWidth || image.Height != cellHeight) &&
+                                        (image.Width != cellWidth * 2 || image.Height != cellHeight * 2)) continue;
+
                                     // Calculate position with offset and scale
                                     int drawX = (x * cellWidth + image.X) / 4;
                                     int drawY = (y * cellHeight + image.Y) / 4;
