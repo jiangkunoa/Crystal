@@ -274,7 +274,7 @@ namespace MapImageExtractor
                             }
                         }
 
-                        // Then draw all middle tiles with size filtering
+                        // Then draw all middle tiles with special handling for non-standard sizes
                         for (int y = 0; y < mapReader.Height; y++)
                         {
                             for (int x = 0; x < mapReader.Width; x++)
@@ -293,20 +293,30 @@ namespace MapImageExtractor
                                     var image = library.GetImage(index);
                                     if (image != null && image.Image != null)
                                     {
-                                        // Apply size filtering like Client project
-                                        if ((image.Width != cellWidth || image.Height != cellHeight) &&
-                                            (image.Width != cellWidth * 2 || image.Height != cellHeight * 2)) continue;
-
                                         // Calculate position with offset - match Client project exactly
                                         int drawX = x * cellWidth + image.X;
                                         int drawY = y * cellHeight + image.Y;
-                                        graphics.DrawImage(image.Image, drawX, drawY);
+
+                                        // Check if image has standard size
+                                        if ((image.Width == cellWidth && image.Height == cellHeight) ||
+                                            (image.Width == cellWidth * 2 && image.Height == cellHeight * 2))
+                                        {
+                                            // Draw standard size images normally
+                                            graphics.DrawImage(image.Image, drawX, drawY);
+                                        }
+                                        else
+                                        {
+                                            // For non-standard sizes, draw with special positioning (like Client's DrawUp)
+                                            // Move image up by its height to match Client's DrawUp behavior
+                                            int adjustedY = drawY - image.Height;
+                                            graphics.DrawImage(image.Image, drawX, adjustedY);
+                                        }
                                     }
                                 }
                             }
                         }
 
-                        // Finally draw all front tiles with size filtering
+                        // Finally draw all front tiles with special handling for non-standard sizes
                         for (int y = 0; y < mapReader.Height; y++)
                         {
                             for (int x = 0; x < mapReader.Width; x++)
@@ -325,14 +335,24 @@ namespace MapImageExtractor
                                     var image = library.GetImage(index);
                                     if (image != null && image.Image != null)
                                     {
-                                        // Apply size filtering like Client project
-                                        if ((image.Width != cellWidth || image.Height != cellHeight) &&
-                                            (image.Width != cellWidth * 2 || image.Height != cellHeight * 2)) continue;
-
                                         // Calculate position with offset - match Client project exactly
                                         int drawX = x * cellWidth + image.X;
                                         int drawY = y * cellHeight + image.Y;
-                                        graphics.DrawImage(image.Image, drawX, drawY);
+
+                                        // Check if image has standard size
+                                        if ((image.Width == cellWidth && image.Height == cellHeight) ||
+                                            (image.Width == cellWidth * 2 && image.Height == cellHeight * 2))
+                                        {
+                                            // Draw standard size images normally
+                                            graphics.DrawImage(image.Image, drawX, drawY);
+                                        }
+                                        else
+                                        {
+                                            // For non-standard sizes, draw with special positioning
+                                            // Move image up by its height to match Client's behavior
+                                            int adjustedY = drawY - image.Height;
+                                            graphics.DrawImage(image.Image, drawX, adjustedY);
+                                        }
                                     }
                                 }
                             }
@@ -431,7 +451,7 @@ namespace MapImageExtractor
                         }
                     }
 
-                    // Then draw all middle tiles with size filtering
+                    // Then draw all middle tiles with special handling for non-standard sizes
                     for (int y = 0; y < mapReader.Height; y++)
                     {
                         for (int x = 0; x < mapReader.Width; x++)
@@ -450,22 +470,32 @@ namespace MapImageExtractor
                                 var image = library.GetImage(index);
                                 if (image != null && image.Image != null)
                                 {
-                                    // Apply size filtering like Client project
-                                    if ((image.Width != cellWidth || image.Height != cellHeight) &&
-                                        (image.Width != cellWidth * 2 || image.Height != cellHeight * 2)) continue;
-
                                     // Calculate position with offset and scale
                                     int drawX = (x * cellWidth + image.X) / 4;
                                     int drawY = (y * cellHeight + image.Y) / 4;
                                     int scaledWidth = Math.Max(1, image.Image.Width / 4);
                                     int scaledHeight = Math.Max(1, image.Image.Height / 4);
-                                    graphics.DrawImage(image.Image, drawX, drawY, scaledWidth, scaledHeight);
+
+                                    // Check if image has standard size
+                                    if ((image.Width == cellWidth && image.Height == cellHeight) ||
+                                        (image.Width == cellWidth * 2 && image.Height == cellHeight * 2))
+                                    {
+                                        // Draw standard size images normally
+                                        graphics.DrawImage(image.Image, drawX, drawY, scaledWidth, scaledHeight);
+                                    }
+                                    else
+                                    {
+                                        // For non-standard sizes, draw with special positioning (like Client's DrawUp)
+                                        // Move image up by its height to match Client's DrawUp behavior
+                                        int adjustedY = (drawY * 4 - image.Height) / 4;
+                                        graphics.DrawImage(image.Image, drawX, adjustedY, scaledWidth, scaledHeight);
+                                    }
                                 }
                             }
                         }
                     }
 
-                    // Finally draw all front tiles with size filtering
+                    // Finally draw all front tiles with special handling for non-standard sizes
                     for (int y = 0; y < mapReader.Height; y++)
                     {
                         for (int x = 0; x < mapReader.Width; x++)
@@ -484,16 +514,26 @@ namespace MapImageExtractor
                                 var image = library.GetImage(index);
                                 if (image != null && image.Image != null)
                                 {
-                                    // Apply size filtering like Client project
-                                    if ((image.Width != cellWidth || image.Height != cellHeight) &&
-                                        (image.Width != cellWidth * 2 || image.Height != cellHeight * 2)) continue;
-
                                     // Calculate position with offset and scale
                                     int drawX = (x * cellWidth + image.X) / 4;
                                     int drawY = (y * cellHeight + image.Y) / 4;
                                     int scaledWidth = Math.Max(1, image.Image.Width / 4);
                                     int scaledHeight = Math.Max(1, image.Image.Height / 4);
-                                    graphics.DrawImage(image.Image, drawX, drawY, scaledWidth, scaledHeight);
+
+                                    // Check if image has standard size
+                                    if ((image.Width == cellWidth && image.Height == cellHeight) ||
+                                        (image.Width == cellWidth * 2 && image.Height == cellHeight * 2))
+                                    {
+                                        // Draw standard size images normally
+                                        graphics.DrawImage(image.Image, drawX, drawY, scaledWidth, scaledHeight);
+                                    }
+                                    else
+                                    {
+                                        // For non-standard sizes, draw with special positioning
+                                        // Move image up by its height to match Client's behavior
+                                        int adjustedY = (drawY * 4 - image.Height) / 4;
+                                        graphics.DrawImage(image.Image, drawX, adjustedY, scaledWidth, scaledHeight);
+                                    }
                                 }
                             }
                         }
