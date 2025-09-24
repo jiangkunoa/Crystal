@@ -15,6 +15,18 @@ namespace MapImageExtractor
             public int OffsetY { get; set; }
         }
 
+        public class MapCellInfo
+        {
+            public int X { get; set; }
+            public int Y { get; set; }
+            public int BackIndex { get; set; }
+            public int TileIndex { get; set; }
+            public int MiddleIndex { get; set; }
+            public int SmObjectIndex { get; set; }
+            public int FrontIndex { get; set; }
+            public int ObjectIndex { get; set; }
+        }
+
         public static List<MapImageInfo> ParseMapFile(string mapFilePath, string dataPath)
         {
             var imageInfos = new List<MapImageInfo>();
@@ -27,28 +39,12 @@ namespace MapImageExtractor
 
             try
             {
-                byte[] fileBytes = File.ReadAllBytes(mapFilePath);
-                int mapType = FindMapType(fileBytes);
+                // Use the Client's MapReader for parsing
+                var mapReader = new MapReader(mapFilePath);
 
-                switch (mapType)
-                {
-                    case 0: // Wemade Mir2 format
-                        ParseWemadeMir2Format(fileBytes, imageInfos, dataPath);
-                        break;
-                    case 1: // Wemade 2010 format
-                    case 2: // Shanda format
-                    case 3: // Shanda 2012 format
-                    case 4: // Wemade antihack format
-                    case 5: // Wemade Mir3 format
-                    case 6: // Shanda Mir3 format
-                    case 7: // 3/4 Heroes format
-                    case 100: // C# custom format
-                        ParseGenericFormat(fileBytes, imageInfos, dataPath, mapType);
-                        break;
-                    default:
-                        Console.WriteLine($"Unknown map format: {mapType}");
-                        break;
-                }
+                // Convert CellInfo to MapImageInfo
+                var cellInfos = new List<MapCellInfo>(); // Not used here but needed for conversion
+                ConvertCellInfoToMapInfo(mapReader, imageInfos, cellInfos, dataPath);
             }
             catch (Exception ex)
             {
@@ -58,44 +54,145 @@ namespace MapImageExtractor
             return imageInfos.DistinctBy(x => x.Index).ToList();
         }
 
-        private static int FindMapType(byte[] input)
+        public static (List<MapImageInfo> imageInfos, List<MapCellInfo> cellInfos, int width, int height) ParseMapFileWithCells(string mapFilePath, string dataPath)
         {
-            // C# custom map format
-            if ((input[2] == 0x43) && (input[3] == 0x23))
-                return 100;
+            var imageInfos = new List<MapImageInfo>();
+            var cellInfos = new List<MapCellInfo>();
 
-            // Wemade mir3 maps have no title, they just start with blank bytes
-            if (input[0] == 0)
-                return 5;
-
-            // Shanda mir3 maps start with title: (C) SNDA, MIR3.
-            if ((input[0] == 0x0F) && (input[5] == 0x53) && (input[14] == 0x33))
-                return 6;
-
-            // Wemade antihack map (laby maps) title start with: Mir2 AntiHack
-            if ((input[0] == 0x15) && (input[4] == 0x32) && (input[6] == 0x41) && (input[19] == 0x31))
-                return 4;
-
-            // Wemade 2010 map format, title starts with: Map 2010 Ver 1.0
-            if ((input[0] == 0x10) && (input[2] == 0x61) && (input[7] == 0x31) && (input[14] == 0x31))
-                return 1;
-
-            // Shanda's 2012 format and older formats
-            if ((input[4] == 0x0F) || (input[4] == 0x03) && (input[18] == 0x0D) && (input[19] == 0x0A))
+            if (!File.Exists(mapFilePath))
             {
-                int W = input[0] + (input[1] << 8);
-                int H = input[2] + (input[3] << 8);
-                if (input.Length > (52 + (W * H * 14)))
-                    return 3;
-                else
-                    return 2;
+                Console.WriteLine($"Map file not found: {mapFilePath}");
+                return (imageInfos, cellInfos, 0, 0);
             }
 
-            // 3/4 Heroes map format
-            if ((input[0] == 0x0D) && (input[1] == 0x4C) && (input[7] == 0x20) && (input[11] == 0x6D))
-                return 7;
+            try
+            {
+                // Use the Client's MapReader for parsing
+                var mapReader = new MapReader(mapFilePath);
+                int width = mapReader.Width;
+                int height = mapReader.Height;
 
-            return 0; // Default to Wemade Mir2
+                Console.WriteLine($"Map dimensions: {width}x{height}");
+
+                // Convert CellInfo to MapCellInfo and MapImageInfo
+                ConvertCellInfoToMapInfo(mapReader, imageInfos, cellInfos, dataPath);
+
+                Console.WriteLine($"Cell count: {cellInfos.Count}, Image count: {imageInfos.Count}");
+                return (imageInfos.DistinctBy(x => x.Index).ToList(), cellInfos, width, height);
+            }
+            catch (Exception ex)
+            {
+                Console.WriteLine($"Error parsing map file: {ex.Message}");
+                Console.WriteLine($"Stack trace: {ex.StackTrace}");
+                return (imageInfos, cellInfos, 0, 0);
+            }
+        }
+
+        private static void ConvertCellInfoToMapInfo(MapReader mapReader, List<MapImageInfo> imageInfos, List<MapCellInfo> cellInfos, string dataPath)
+        {
+            var addedIndices = new HashSet<string>(); // To avoid duplicates
+
+            for (int x = 0; x < mapReader.Width; x++)
+            {
+                for (int y = 0; y < mapReader.Height; y++)
+                {
+                    var cell = mapReader.MapCells[x, y];
+
+                    // Add cell info
+                    var cellInfo = new MapCellInfo
+                    {
+                        X = x,
+                        Y = y,
+                        BackIndex = cell.BackIndex,
+                        TileIndex = cell.BackImage,
+                        MiddleIndex = cell.MiddleIndex,
+                        SmObjectIndex = cell.MiddleImage,
+                        FrontIndex = cell.FrontIndex,
+                        ObjectIndex = cell.FrontImage
+                    };
+                    cellInfos.Add(cellInfo);
+
+                    // Add image info for back tiles
+                    if (cell.BackIndex >= 0 && cell.BackImage > 0)
+                    {
+                        string libraryPath = GetLibraryPath(cell.BackIndex, 0); // 0 for back tiles
+                        string key = $"{libraryPath}_{cell.BackImage}";
+                        if (!addedIndices.Contains(key))
+                        {
+                            AddImageInfo(imageInfos, cell.BackImage, libraryPath, dataPath);
+                            addedIndices.Add(key);
+                        }
+                    }
+
+                    // Add image info for middle tiles
+                    if (cell.MiddleIndex >= 0 && cell.MiddleImage > 0)
+                    {
+                        string libraryPath = GetLibraryPath(cell.MiddleIndex, 1); // 1 for middle tiles
+                        string key = $"{libraryPath}_{cell.MiddleImage}";
+                        if (!addedIndices.Contains(key))
+                        {
+                        AddImageInfo(imageInfos, cell.MiddleImage, libraryPath, dataPath);
+                            addedIndices.Add(key);
+                        }
+                    }
+
+                    // Add image info for front tiles
+                    if (cell.FrontIndex >= 0 && cell.FrontImage > 0)
+                    {
+                        string libraryPath = GetLibraryPath(cell.FrontIndex, 2); // 2 for front tiles
+                        string key = $"{libraryPath}_{cell.FrontImage}";
+                        if (!addedIndices.Contains(key))
+                        {
+                            AddImageInfo(imageInfos, cell.FrontImage, libraryPath, dataPath);
+                            addedIndices.Add(key);
+                        }
+                    }
+                }
+            }
+        }
+
+        private static string GetLibraryPath(short index, int layer)
+        {
+            // Determine library path based on index and layer
+            // This is a simplified version - you may need to adjust based on your specific library structure
+            return index switch
+            {
+                >= 0 and < 100 => layer switch
+                {
+                    0 => "Map/WemadeMir2/Tiles",      // Back tiles
+                    1 => "Map/WemadeMir2/Smtiles",    // Middle tiles
+                    2 => "Map/WemadeMir2/Objects",    // Front tiles
+                    _ => "Map/WemadeMir2/Tiles"
+                },
+                >= 100 and < 200 => layer switch
+                {
+                    0 => "Map/ShandaMir2/Tiles",
+                    1 => "Map/ShandaMir2/SmTiles",
+                    2 => "Map/ShandaMir2/Objects",
+                    _ => "Map/ShandaMir2/Tiles"
+                },
+                >= 200 and < 300 => layer switch
+                {
+                    0 => "Map/WemadeMir3/Tilesc",
+                    1 => "Map/WemadeMir3/Smtilesc",
+                    2 => "Map/WemadeMir3/Objects",
+                    _ => "Map/WemadeMir3/Tilesc"
+                },
+                >= 300 and < 400 => layer switch
+                {
+                    0 => "Map/ShandaMir3/Tiles",
+                    1 => "Map/ShandaMir3/SmTiles",
+                    2 => "Map/ShandaMir3/Objects",
+                    _ => "Map/ShandaMir3/Tiles"
+                },
+                _ => layer switch
+                {
+                    0 => "Map/WemadeMir2/Tiles",
+                    1 => "Map/WemadeMir2/Smtiles",
+                    2 => "Map/WemadeMir2/Objects",
+                    _ => "Map/WemadeMir2/Tiles"
+                }
+            };
         }
 
         private static void ParseWemadeMir2Format(byte[] fileBytes, List<MapImageInfo> imageInfos, string dataPath)
@@ -117,6 +214,7 @@ namespace MapImageExtractor
 
                     int objectIndex = BitConverter.ToInt16(fileBytes, offset);
                     offset += 2;
+                    
 
                     // Skip door index and light bytes
                     offset += 4;
@@ -129,36 +227,6 @@ namespace MapImageExtractor
             }
         }
 
-        private static void ParseGenericFormat(byte[] fileBytes, List<MapImageInfo> imageInfos, string dataPath, int mapType)
-        {
-            // Generic parsing for other formats - extract potential image indices
-            // This is a simplified approach; real implementation would need format-specific parsing
-
-            int width = BitConverter.ToInt16(fileBytes, 0);
-            int height = BitConverter.ToInt16(fileBytes, 2);
-
-            // Scan for potential image indices in the file
-            for (int i = 0; i < fileBytes.Length - 1; i++)
-            {
-                ushort potentialIndex = BitConverter.ToUInt16(fileBytes, i);
-
-                // Check if this looks like a valid image index (within reasonable range)
-                if (potentialIndex > 0 && potentialIndex < 10000)
-                {
-                    // Try different library paths based on map type
-                    string[] possibleLibraries = mapType switch
-                    {
-                        5 or 6 => new[] { "Map/WemadeMir3/Tilesc", "Map/WemadeMir3/Smtilesc", "Map/WemadeMir3/Objects" },
-                        _ => new[] { "Map/ShandaMir2/Tiles", "Map/ShandaMir2/SmTiles", "Map/ShandaMir2/Objects" }
-                    };
-
-                    foreach (var library in possibleLibraries)
-                    {
-                        AddImageInfo(imageInfos, potentialIndex, library, dataPath);
-                    }
-                }
-            }
-        }
 
         private static void AddImageInfo(List<MapImageInfo> imageInfos, int index, string libraryPath, string dataPath)
         {

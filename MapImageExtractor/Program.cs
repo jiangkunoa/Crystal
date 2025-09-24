@@ -1,3 +1,7 @@
+using System.Drawing;
+using System.Drawing.Imaging;
+using System.Linq;
+
 namespace MapImageExtractor
 {
     class Program
@@ -15,6 +19,7 @@ namespace MapImageExtractor
             string dataDirectory = "./Data";
             string mapDirectory = "./Map";
             bool verbose = false;
+            bool outputFullMap = false;
 
             // Parse simple command line arguments
             for (int i = 1; i < args.Length; i++)
@@ -27,9 +32,11 @@ namespace MapImageExtractor
                     mapDirectory = args[++i];
                 else if (args[i] == "-v")
                     verbose = true;
+                else if (args[i] == "--full-map")
+                    outputFullMap = true;
             }
 
-            Run(mapName, outputDirectory, dataDirectory, mapDirectory, verbose);
+            Run(mapName, outputDirectory, dataDirectory, mapDirectory, verbose, outputFullMap);
         }
 
         static void PrintUsage()
@@ -44,9 +51,10 @@ namespace MapImageExtractor
             Console.WriteLine("  -d <dir>       Data directory (default: ./Data)");
             Console.WriteLine("  --map-path <dir> Map directory (default: ./Map)");
             Console.WriteLine("  -v             Enable verbose output");
+            Console.WriteLine("  --full-map     Output full map image");
         }
 
-        static void Run(string mapName, string outputDirectory, string dataDirectory, string mapDirectory, bool verbose)
+        static void Run(string mapName, string outputDirectory, string dataDirectory, string mapDirectory, bool verbose, bool outputFullMap)
         {
             try
             {
@@ -133,6 +141,13 @@ namespace MapImageExtractor
                     }
                 }
 
+                // Create full map image if requested
+                if (outputFullMap)
+                {
+                    Console.WriteLine("Creating full map image...");
+                    CreateFullMapImage(mapFilePath, dataDirectory, outputPath, libraries, verbose);
+                }
+
                 // Save parameters file
                 MapParser.SaveParameters(imageInfos, outputPath, mapName);
 
@@ -153,6 +168,130 @@ namespace MapImageExtractor
                 Console.WriteLine($"Fatal error: {ex.Message}");
                 if (verbose)
                     Console.WriteLine($"Stack trace: {ex.StackTrace}");
+            }
+        }
+
+        static void CreateFullMapImage(string mapFilePath, string dataDirectory, string outputPath, Dictionary<string, MLibrary> libraries, bool verbose)
+        {
+            try
+            {
+                Console.WriteLine($"Creating full map image for: {mapFilePath}");
+                // Parse map with cell information
+                var (imageInfos, cellInfos, width, height) = MapParser.ParseMapFileWithCells(mapFilePath, dataDirectory);
+
+                Console.WriteLine($"Parse result - Width: {width}, Height: {height}, Cells: {cellInfos.Count}, Images: {imageInfos.Count}");
+
+                if (width <= 0 || height <= 0)
+                {
+                    Console.WriteLine("Cannot create full map image: invalid map dimensions");
+                    return;
+                }
+
+                if (cellInfos.Count == 0)
+                {
+                    Console.WriteLine("Cannot create full map image: no cell data found");
+                    return;
+                }
+
+                // Preload required libraries
+                var requiredLibraries = imageInfos.Select(i => i.Library.ToLower()).Distinct().ToList();
+                foreach (var libPath in requiredLibraries)
+                {
+                    string fullLibPath = Path.Combine(dataDirectory, libPath);
+                    string libKey = libPath.ToLower();
+                    if (!libraries.ContainsKey(libKey))
+                    {
+                        try
+                        {
+                            var library = new MLibrary(fullLibPath);
+                            library.Initialize();
+                            libraries[libKey] = library;
+                        }
+                        catch (Exception ex)
+                        {
+                            if (verbose)
+                                Console.WriteLine($"Warning: Failed to load library {libPath}: {ex.Message}");
+                        }
+                    }
+                }
+
+                // Create full map image
+                // For simplicity, we'll assume each cell is 48x32 pixels (standard tile size)
+                const int cellWidth = 48;
+                const int cellHeight = 32;
+                int mapWidth = width * cellWidth;
+                int mapHeight = height * cellHeight;
+
+                using (var fullMapBitmap = new Bitmap(mapWidth, mapHeight))
+                using (var graphics = Graphics.FromImage(fullMapBitmap))
+                {
+                    graphics.Clear(Color.Black);
+
+                    // Draw each cell in correct Z-order: Back -> Middle -> Front
+                    foreach (var cellInfo in cellInfos)
+                    {
+                        // Draw back layer (background tiles)
+                        if (cellInfo.TileIndex > 0)
+                        {
+                            string backLibraryPath = MapParser.GetLibraryPath((short)cellInfo.BackIndex, 0); // 0 for back tiles
+                            DrawCellImage(graphics, libraries, backLibraryPath, cellInfo.TileIndex,
+                                        cellInfo.X * cellWidth, cellInfo.Y * cellHeight, verbose);
+                        }
+
+                        // Draw middle layer (small objects)
+                        if (cellInfo.SmObjectIndex > 0)
+                        {
+                            string middleLibraryPath = MapParser.GetLibraryPath((short)cellInfo.MiddleIndex, 1); // 1 for middle tiles
+                            DrawCellImage(graphics, libraries, middleLibraryPath, cellInfo.SmObjectIndex,
+                                        cellInfo.X * cellWidth, cellInfo.Y * cellHeight, verbose);
+                        }
+
+                        // Draw front layer (objects including blue tiles)
+                        if (cellInfo.ObjectIndex > 0)
+                        {
+                            string frontLibraryPath = MapParser.GetLibraryPath((short)cellInfo.FrontIndex, 2); // 2 for front tiles
+                            DrawCellImage(graphics, libraries, frontLibraryPath, cellInfo.ObjectIndex,
+                                        cellInfo.X * cellWidth, cellInfo.Y * cellHeight, verbose);
+                        }
+                    }
+
+                    // Save full map image
+                    string fullMapPath = Path.Combine(outputPath, "full_map.png");
+                    fullMapBitmap.Save(fullMapPath, ImageFormat.Png);
+                    Console.WriteLine($"Full map image saved to: {fullMapPath}");
+                }
+            }
+            catch (Exception ex)
+            {
+                Console.WriteLine($"Error creating full map image: {ex.Message}");
+                if (verbose)
+                    Console.WriteLine($"Stack trace: {ex.StackTrace}");
+            }
+        }
+
+        static void DrawCellImage(Graphics graphics, Dictionary<string, MLibrary> libraries,
+                                string libraryPath, int imageIndex, int x, int y, bool verbose)
+        {
+            try
+            {
+                string libKey = libraryPath.ToLower();
+                if (libraries.ContainsKey(libKey))
+                {
+                    var library = libraries[libKey];
+                    var image = library.GetImage(imageIndex);
+                    if (image != null && image.Image != null)
+                    {
+                        // Calculate position with offset
+                        int drawX = x + image.X;
+                        int drawY = y + image.Y;
+                        graphics.DrawImage(image.Image, drawX, drawY);
+                    }
+                }
+            }
+            catch (Exception ex)
+            {
+                if (verbose)
+                    Console.WriteLine($"Warning: Failed to draw image {imageIndex} from {libraryPath}: {ex.Message}");
             }
         }
 
