@@ -225,23 +225,25 @@ namespace MapImageExtractor
                 int mapWidth = width * cellWidth;
                 int mapHeight = height * cellHeight;
 
-                // Check if the map size is too large and reduce it if necessary
-                const int maxDimension = 32767; // Maximum bitmap dimension
-                if (mapWidth > maxDimension || mapHeight > maxDimension)
-                {
-                    Console.WriteLine($"Map size ({mapWidth}x{mapHeight}) is too large, scaling down...");
-                    double scale = Math.Min((double)maxDimension / mapWidth, (double)maxDimension / mapHeight);
-                    mapWidth = (int)(mapWidth * scale);
-                    mapHeight = (int)(mapHeight * scale);
-                    Console.WriteLine($"Scaled map size: {mapWidth}x{mapHeight}");
-                }
-
                 // Use MapReader to get proper cell info
                 var mapReader = new MapReader(mapFilePath);
 
+                // Check if the map size is too large and reduce it if necessary
+                const int maxDimension = 32767; // Maximum bitmap dimension
+                int scaledMapWidth = mapWidth;
+                int scaledMapHeight = mapHeight;
+                if (scaledMapWidth > maxDimension || scaledMapHeight > maxDimension)
+                {
+                    Console.WriteLine($"Map size ({scaledMapWidth}x{scaledMapHeight}) is too large, scaling down...");
+                    double scale = Math.Min((double)maxDimension / scaledMapWidth, (double)maxDimension / scaledMapHeight);
+                    scaledMapWidth = (int)(scaledMapWidth * scale);
+                    scaledMapHeight = (int)(scaledMapHeight * scale);
+                    Console.WriteLine($"Scaled map size: {scaledMapWidth}x{scaledMapHeight}");
+                }
+
                 try
                 {
-                    using (var fullMapBitmap = new Bitmap(mapWidth, mapHeight))
+                    using (var fullMapBitmap = new Bitmap(scaledMapWidth, scaledMapHeight))
                     using (var graphics = Graphics.FromImage(fullMapBitmap))
                     {
                         graphics.Clear(Color.Black);
@@ -297,20 +299,17 @@ namespace MapImageExtractor
                                         int drawX = x * cellWidth + image.X;
                                         int drawY = y * cellHeight + image.Y;
 
-                                        // Check if image has standard size
-                                        if ((image.Width == cellWidth && image.Height == cellHeight) ||
-                                            (image.Width == cellWidth * 2 && image.Height == cellHeight * 2))
-                                        {
-                                            // Draw standard size images normally
-                                            graphics.DrawImage(image.Image, drawX, drawY);
-                                        }
-                                        else
+                                        // Apply size filtering like Client project
+                                        if ((image.Width != cellWidth || image.Height != cellHeight) &&
+                                            (image.Width != cellWidth * 2 || image.Height != cellHeight * 2))
                                         {
                                             // For non-standard sizes, draw with special positioning (like Client's DrawUp)
                                             // Move image up by its height to match Client's DrawUp behavior
-                                            int adjustedY = drawY - image.Height;
-                                            graphics.DrawImage(image.Image, drawX, adjustedY);
+                                            drawY -= image.Height;
                                         }
+
+                                        // Draw all middle tiles
+                                        graphics.DrawImage(image.Image, drawX, drawY);
                                     }
                                 }
                             }
@@ -324,7 +323,14 @@ namespace MapImageExtractor
                                 var cell = mapReader.MapCells[x, y];
                                 int index = (cell.FrontImage & 0x7FFF) - 1;
 
-                                if (index == -1 || cell.FrontIndex == -1) continue;
+                                if (index < 0 || cell.FrontIndex == -1) continue;
+
+                                // Handle door index like Client project
+                                if (cell.DoorIndex > 0)
+                                {
+                                    // Use door offset to adjust index
+                                    index += cell.DoorOffset;
+                                }
 
                                 string frontLibraryPath = MapParser.GetLibraryPath(cell.FrontIndex, 2);
                                 string libKey = frontLibraryPath.ToLower();
@@ -335,24 +341,24 @@ namespace MapImageExtractor
                                     var image = library.GetImage(index);
                                     if (image != null && image.Image != null)
                                     {
+                                        // Skip file index 200 like Client project
+                                        if (cell.FrontIndex == 200) continue;
+
                                         // Calculate position with offset - match Client project exactly
                                         int drawX = x * cellWidth + image.X;
                                         int drawY = y * cellHeight + image.Y;
 
-                                        // Check if image has standard size
-                                        if ((image.Width == cellWidth && image.Height == cellHeight) ||
-                                            (image.Width == cellWidth * 2 && image.Height == cellHeight * 2))
+                                        // Apply size filtering like Client project
+                                        if ((image.Width != cellWidth || image.Height != cellHeight) &&
+                                            (image.Width != cellWidth * 2 || image.Height != cellHeight * 2))
                                         {
-                                            // Draw standard size images normally
-                                            graphics.DrawImage(image.Image, drawX, drawY);
+                                            // For non-standard sizes, draw with special positioning (like Client's DrawUp)
+                                            // Move image up by its height to match Client's DrawUp behavior
+                                            drawY -= image.Height;
                                         }
-                                        else
-                                        {
-                                            // For non-standard sizes, draw with special positioning
-                                            // Move image up by its height to match Client's behavior
-                                            int adjustedY = drawY - image.Height;
-                                            graphics.DrawImage(image.Image, drawX, adjustedY);
-                                        }
+
+                                        // Draw all front tiles
+                                        graphics.DrawImage(image.Image, drawX, drawY);
                                     }
                                 }
                             }
@@ -503,7 +509,14 @@ namespace MapImageExtractor
                             var cell = mapReader.MapCells[x, y];
                             int index = (cell.FrontImage & 0x7FFF) - 1;
 
-                            if (index == -1 || cell.FrontIndex == -1) continue;
+                            if (index < 0 || cell.FrontIndex == -1) continue;
+
+                            // Handle door index like Client project
+                            if (cell.DoorIndex > 0)
+                            {
+                                // Use door offset to adjust index
+                                index += cell.DoorOffset;
+                            }
 
                             string frontLibraryPath = MapParser.GetLibraryPath(cell.FrontIndex, 2);
                             string libKey = frontLibraryPath.ToLower();
@@ -514,6 +527,9 @@ namespace MapImageExtractor
                                 var image = library.GetImage(index);
                                 if (image != null && image.Image != null)
                                 {
+                                    // Skip file index 200 like Client project
+                                    if (cell.FrontIndex == 200) continue;
+
                                     // Calculate position with offset and scale
                                     int drawX = (x * cellWidth + image.X) / 4;
                                     int drawY = (y * cellHeight + image.Y) / 4;
