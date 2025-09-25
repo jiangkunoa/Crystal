@@ -7,6 +7,8 @@ namespace MapImageExtractor
     {
         private const int CellWidth = 48;
         private const int CellHeight = 32;
+        
+        private static Dictionary<String, MImage> cachedImages = new Dictionary<String, MImage>();
 
         public static void RenderFullMap(MapReader mapReader, string outputDirectory, bool verbose = false)
         {
@@ -39,6 +41,18 @@ namespace MapImageExtractor
                         fullMapBitmap.Save(fullMapPath, ImageFormat.Png);
                         Console.WriteLine($"Full map image saved to: {fullMapPath}");
                     }
+                    //图片保存
+                    foreach (var item in cachedImages)
+                    {
+                        string[] strings = item.Key.Split("/");
+                        for (var i = 0; i < strings.Length - 1; i++)
+                        {
+                            string dirName = strings[i];
+                            Directory.CreateDirectory(Path.Combine(outputDirectory, dirName));
+                        }
+                        item.Value.Image.Save(Path.Combine(outputDirectory, item.Key + ".png"), ImageFormat.Png);
+                        
+                    }
                 }
                 catch (Exception ex)
                 {
@@ -53,6 +67,22 @@ namespace MapImageExtractor
             }
         }
 
+        private static MImage GetSaveImage(int libIndex, int imgIndex)
+        {
+            MLibrary mLibrary = Libraries.MapLibs[libIndex];
+            MImage image = mLibrary.GetImage(imgIndex);
+            if (image != null)
+            {
+                string cacheKey = $"{libIndex}/{imgIndex}";
+                if (!cachedImages.ContainsKey(cacheKey))
+                {
+                    cachedImages.Add(cacheKey, image);
+                }
+                // image.Image.Save(Path.Combine(outputDirectory, $"{libIndex}_{imgIndex}.png"), ImageFormat.Png);
+            }
+            return image;
+        }
+        
         private static void DrawBackLayer(MapReader mapReader, Graphics graphics)
         {
             Console.WriteLine("Drawing back layer...");
@@ -64,8 +94,7 @@ namespace MapImageExtractor
                     if ((cell.BackImage == 0) || (cell.BackIndex == -1)) continue;
 
                     int index = (cell.BackImage & 0x1FFFFFFF) - 1;
-                    MLibrary mLibrary = Libraries.MapLibs[cell.BackIndex];
-                    MImage image = mLibrary.GetImage(index);
+                    MImage image = GetSaveImage(cell.BackIndex, index);
                     if (image != null) {
                         // Calculate scaled position with offset
                         int drawX = ((x * CellWidth + image.X));
@@ -103,8 +132,7 @@ namespace MapImageExtractor
                         }
                     }
                     // Libraries.MapLibs[cell.MiddleIndex].Draw(index, drawX, drawY);
-                    MLibrary mLibrary = Libraries.MapLibs[cell.MiddleIndex];
-                    MImage image = mLibrary.GetImage(index);
+                    MImage image = GetSaveImage(cell.MiddleIndex, index);
                     if (image != null) {
                         // Calculate scaled position with offset
                         int drawX = ((x * CellWidth + image.X));
@@ -159,8 +187,7 @@ namespace MapImageExtractor
                         skippedCount++;
                         continue;
                     }
-                    MLibrary mLibrary = Libraries.MapLibs[fileIndex];
-                    MImage image = mLibrary.GetImage(index);
+                    MImage image = GetSaveImage(fileIndex, index);
                     if (image != null) {
                         // Calculate scaled position with offset
                         int drawX = ((x * CellWidth + image.X));
@@ -226,7 +253,7 @@ namespace MapImageExtractor
                     Size s = Libraries.MapLibs[fileIndex].GetSize(index);
                     if (s.Width == CellWidth && s.Height == CellHeight && animation == 0) continue;
                     if ((s.Width == CellWidth * 2) && (s.Height == CellHeight * 2) && (animation == 0)) continue;
-                    MImage image = Libraries.MapLibs[fileIndex].GetImage(index);
+                    MImage image = GetSaveImage(fileIndex, index);
                     int drawX = ((x * CellWidth));
                     int drawY = ((y * CellHeight));
                     if (blend)
