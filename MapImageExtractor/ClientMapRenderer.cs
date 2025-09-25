@@ -183,7 +183,7 @@ namespace MapImageExtractor
                     }
 
                     if (index < 0 || ((s.Width != CellWidth || s.Height != CellHeight) && ((s.Width != CellWidth * 2) || (s.Height != CellHeight * 2)))) {
-                        Console.WriteLine($"Skipped front tile at ({x}, {y}), index: {index}, size: {s.Width}x{s.Height}");
+                        // Console.WriteLine($"Skipped front tile at ({x}, {y}), index: {index}, size: {s.Width}x{s.Height}");
                         skippedCount++;
                         continue;
                     }
@@ -199,7 +199,7 @@ namespace MapImageExtractor
                 }
             }
             Console.WriteLine($"Front layer: {drawnCount} tiles drawn, {skippedCount} tiles skipped due to size");
-
+            int frontDrawn2 = 0;
             for (int y = 0; y < mapReader.Height; y++)
             {
                 for (int x = 0; x < mapReader.Width; x++)
@@ -256,6 +256,7 @@ namespace MapImageExtractor
                     MImage image = GetSaveImage(fileIndex, index);
                     int drawX = ((x * CellWidth));
                     int drawY = ((y * CellHeight));
+                    
                     if (blend)
                     {
                         if (fileIndex == 14 || fileIndex == 27 || (fileIndex > 99 & fileIndex < 199))
@@ -276,8 +277,11 @@ namespace MapImageExtractor
                         else
                             Draw(graphics, image, drawX, drawY - s.Height, Color.White, false);
                     }
+
+                    frontDrawn2 += 1;
                 }
             }
+            Console.WriteLine($"Drawing finished. frontDrawn2: {frontDrawn2}");
         }
         
         private static void DrawBlend()
@@ -290,8 +294,9 @@ namespace MapImageExtractor
 
             if (offSet)
             {
-                x = x + image.X;
-                y = y + image.Y;
+                Console.WriteLine($"Drawing offset image at {x}, {y}");
+                x += image.X;
+                y += image.Y;
             }
             graphics.DrawImage(image.Image, x, y);
             // DXManager.Draw(mi.Image, new Rectangle(0, 0, mi.Width, mi.Height), new Vector3((float)point.X, (float)point.Y, 0.0F), colour);
