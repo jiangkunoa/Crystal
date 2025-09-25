@@ -88,8 +88,13 @@ namespace MapImageExtractor
             Console.WriteLine("Drawing back layer...");
             for (int y = 0; y < mapReader.Height; y++)
             {
+                if (y <= 0 || y % 2 == 1) continue;
+                int drawY = ((y * CellHeight));
                 for (int x = 0; x < mapReader.Width; x++)
                 {
+                    if (x <= 0 || x % 2 == 1) continue;
+                    int drawX = ((x * CellWidth));
+                    
                     var cell = mapReader.MapCells[x, y];
                     if ((cell.BackImage == 0) || (cell.BackIndex == -1)) continue;
 
@@ -97,8 +102,7 @@ namespace MapImageExtractor
                     MImage image = GetSaveImage(cell.BackIndex, index);
                     if (image != null) {
                         // Calculate scaled position with offset
-                        int drawX = ((x * CellWidth + image.X));
-                        int drawY = ((y * CellHeight + image.Y));
+                        
                         graphics.DrawImage(image.Image, drawX, drawY);
                         // Console.WriteLine($"Drawn back tile at ({x}, {y})");
                     }
@@ -114,8 +118,12 @@ namespace MapImageExtractor
 
             for (int y = 0; y < mapReader.Height; y++)
             {
+                if (y <= 0) continue;
+                int drawY = y * CellHeight;
                 for (int x = 0; x < mapReader.Width; x++)
                 {
+                    if (x < 0) continue;
+                    int drawX = x * CellWidth;
                     var cell = mapReader.MapCells[x, y];
                     int index = cell.MiddleImage - 1;
                     if ((index < 0) || (cell.MiddleIndex == -1)) continue;
@@ -123,7 +131,6 @@ namespace MapImageExtractor
                     {
                         //mir3 mid layer is same level as front layer not real middle + it cant draw index -1 so 2 birds in one stone :p
                         Size s = Libraries.MapLibs[cell.MiddleIndex].GetSize(index);
-
                         if ((s.Width != CellWidth || s.Height != CellHeight) &&
                             ((s.Width != CellWidth * 2) || (s.Height != CellHeight * 2))) {
                             Console.WriteLine($"Skipped middle tile at ({x}, {y}), index: {index}, size: {s.Width}x{s.Height}");
@@ -134,13 +141,7 @@ namespace MapImageExtractor
                     // Libraries.MapLibs[cell.MiddleIndex].Draw(index, drawX, drawY);
                     MImage image = GetSaveImage(cell.MiddleIndex, index);
                     if (image != null) {
-                        // Calculate scaled position with offset
-                        int drawX = ((x * CellWidth + image.X));
-                        int drawY = ((y * CellHeight + image.Y));
                         graphics.DrawImage(image.Image, drawX, drawY);
-                        // if (verbose) {
-                        //     Console.WriteLine($"Drawn middle tile at ({x}, {y}), index: {index}, size: {image.Width}x{image.Height}");
-                        // }
                         drawnCount++;
                     }
                 }
@@ -156,8 +157,12 @@ namespace MapImageExtractor
 
             for (int y = 0; y < mapReader.Height; y++)
             {
+                if (y <= 0) continue;
+                int drawY = y * CellHeight;
                 for (int x = 0; x < mapReader.Width; x++)
                 {
+                    if (x < 0) continue;
+                    int drawX = x * CellWidth;
                     var cell = mapReader.MapCells[x, y];
                     int index = (cell.FrontImage & 0x7FFF) - 1;
                     if (index == -1) continue;
@@ -190,8 +195,6 @@ namespace MapImageExtractor
                     MImage image = GetSaveImage(fileIndex, index);
                     if (image != null) {
                         // Calculate scaled position with offset
-                        int drawX = ((x * CellWidth + image.X));
-                        int drawY = ((y * CellHeight + image.Y));
                         graphics.DrawImage(image.Image, drawX, drawY);
                         // Console.WriteLine($"Drawn front tile at ({x}, {y}), index: {index}, size: {image.Width}x{image.Height}");
                         drawnCount++;
@@ -202,8 +205,12 @@ namespace MapImageExtractor
             int frontDrawn2 = 0;
             for (int y = 0; y < mapReader.Height; y++)
             {
+                if (y <= 0) continue;
+                int drawY = (y + 1) * CellHeight;
                 for (int x = 0; x < mapReader.Width; x++)
                 {
+                    if (x < 0) continue;
+                    int drawX = x * CellWidth;
                     var cell = mapReader.MapCells[x, y];
                     int index = (cell.FrontImage & 0x7FFF) - 1;
                     if (index < 0) continue;
@@ -253,10 +260,8 @@ namespace MapImageExtractor
                     Size s = Libraries.MapLibs[fileIndex].GetSize(index);
                     if (s.Width == CellWidth && s.Height == CellHeight && animation == 0) continue;
                     if ((s.Width == CellWidth * 2) && (s.Height == CellHeight * 2) && (animation == 0)) continue;
+
                     MImage image = GetSaveImage(fileIndex, index);
-                    int drawX = ((x * CellWidth));
-                    int drawY = ((y * CellHeight));
-                    
                     if (blend)
                     {
                         if (fileIndex == 14 || fileIndex == 27 || (fileIndex > 99 & fileIndex < 199))
