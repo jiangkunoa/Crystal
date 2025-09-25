@@ -30,9 +30,9 @@ namespace MapImageExtractor
                             Thread.Sleep(100);
                         }
                         // Draw each cell in correct Z-order: Back -> Middle -> Front
-                        // DrawBackLayer(mapReader, graphics, verbose);
-                        // DrawMiddleLayer(mapReader, graphics, verbose);
-                        DrawFrontLayer(mapReader, graphics, verbose);
+                        DrawBackLayer(mapReader, graphics);
+                        DrawMiddleLayer(mapReader, graphics);
+                        DrawFrontLayer(mapReader, graphics);
 
                         // Save full map image
                         string fullMapPath = Path.Combine(outputDirectory, mapReader.GetFileName() + "_full_map.png");
@@ -53,7 +53,7 @@ namespace MapImageExtractor
             }
         }
 
-        private static void DrawBackLayer(MapReader mapReader, Graphics graphics, bool verbose)
+        private static void DrawBackLayer(MapReader mapReader, Graphics graphics)
         {
             Console.WriteLine("Drawing back layer...");
             for (int y = 0; y < mapReader.Height; y++)
@@ -71,16 +71,18 @@ namespace MapImageExtractor
                         int drawX = ((x * CellWidth + image.X));
                         int drawY = ((y * CellHeight + image.Y));
                         graphics.DrawImage(image.Image, drawX, drawY);
-                        Console.WriteLine($"Drawn back tile at ({x}, {y})");
+                        // Console.WriteLine($"Drawn back tile at ({x}, {y})");
                     }
                 }
             }
         }
 
-        private static void DrawMiddleLayer(MapReader mapReader, Graphics graphics, bool verbose)
+        private static void DrawMiddleLayer(MapReader mapReader, Graphics graphics)
         {
             Console.WriteLine("Drawing middle layer...");
-            
+            int skippedCount = 0;
+            int drawnCount = 0;
+
             for (int y = 0; y < mapReader.Height; y++)
             {
                 for (int x = 0; x < mapReader.Width; x++)
@@ -94,7 +96,11 @@ namespace MapImageExtractor
                         Size s = Libraries.MapLibs[cell.MiddleIndex].GetSize(index);
 
                         if ((s.Width != CellWidth || s.Height != CellHeight) &&
-                            ((s.Width != CellWidth * 2) || (s.Height != CellHeight * 2))) continue;
+                            ((s.Width != CellWidth * 2) || (s.Height != CellHeight * 2))) {
+                            Console.WriteLine($"Skipped middle tile at ({x}, {y}), index: {index}, size: {s.Width}x{s.Height}");
+                            skippedCount++;
+                            continue;
+                        }
                     }
                     // Libraries.MapLibs[cell.MiddleIndex].Draw(index, drawX, drawY);
                     MLibrary mLibrary = Libraries.MapLibs[cell.MiddleIndex];
@@ -104,15 +110,21 @@ namespace MapImageExtractor
                         int drawX = ((x * CellWidth + image.X));
                         int drawY = ((y * CellHeight + image.Y));
                         graphics.DrawImage(image.Image, drawX, drawY);
-                        Console.WriteLine($"Drawn middle tile at ({x}, {y})");
+                        // if (verbose) {
+                        //     Console.WriteLine($"Drawn middle tile at ({x}, {y}), index: {index}, size: {image.Width}x{image.Height}");
+                        // }
+                        drawnCount++;
                     }
                 }
             }
+            Console.WriteLine($"Middle layer: {drawnCount} tiles drawn, {skippedCount} tiles skipped due to size");
         }
 
-        private static void DrawFrontLayer(MapReader mapReader, Graphics graphics, bool verbose)
+        private static void DrawFrontLayer(MapReader mapReader, Graphics graphics)
         {
             Console.WriteLine("Drawing front layer...");
+            int skippedCount = 0;
+            int drawnCount = 0;
 
             for (int y = 0; y < mapReader.Height; y++)
             {
@@ -141,8 +153,12 @@ namespace MapImageExtractor
                         //     }
                         // }
                     }
-                    
-                    if (index < 0 || ((s.Width != CellWidth || s.Height != CellHeight) && ((s.Width != CellWidth * 2) || (s.Height != CellHeight * 2)))) continue;
+
+                    if (index < 0 || ((s.Width != CellWidth || s.Height != CellHeight) && ((s.Width != CellWidth * 2) || (s.Height != CellHeight * 2)))) {
+                        Console.WriteLine($"Skipped front tile at ({x}, {y}), index: {index}, size: {s.Width}x{s.Height}");
+                        skippedCount++;
+                        continue;
+                    }
                     MLibrary mLibrary = Libraries.MapLibs[fileIndex];
                     MImage image = mLibrary.GetImage(index);
                     if (image != null) {
@@ -150,10 +166,118 @@ namespace MapImageExtractor
                         int drawX = ((x * CellWidth + image.X));
                         int drawY = ((y * CellHeight + image.Y));
                         graphics.DrawImage(image.Image, drawX, drawY);
-                        Console.WriteLine($"Drawn front tile at ({x}, {y}), index: {index}, size: {image.Width}, size: {image.Height}");
+                        // Console.WriteLine($"Drawn front tile at ({x}, {y}), index: {index}, size: {image.Width}x{image.Height}");
+                        drawnCount++;
+                    }
+                }
+            }
+            Console.WriteLine($"Front layer: {drawnCount} tiles drawn, {skippedCount} tiles skipped due to size");
+
+            for (int y = 0; y < mapReader.Height; y++)
+            {
+                for (int x = 0; x < mapReader.Width; x++)
+                {
+                    var cell = mapReader.MapCells[x, y];
+                    int index = (cell.FrontImage & 0x7FFF) - 1;
+                    if (index < 0) continue;
+                    int fileIndex = cell.FrontIndex;
+                    if (fileIndex == -1) continue;
+                    byte animation = cell.FrontAnimationFrame;
+                    bool blend;
+                    if ((animation & 0x80) > 0)
+                    {
+                        blend = true;
+                        animation &= 0x7F;
+                    }
+                    else
+                        blend = false;
+
+
+                    if (animation > 0)
+                    {
+                        byte animationTick = cell.FrontAnimationTick;
+                        // index += (AnimationCount % (animation + (animation * animationTick))) / (1 + animationTick);
+                        index += (1 % (animation + (animation * animationTick))) / (1 + animationTick);
+                    }
+
+
+                    // if (cell.DoorIndex > 0)
+                    // {
+                    //     Door DoorInfo = GetDoor(cell.DoorIndex);
+                    //     if (DoorInfo == null)
+                    //     {
+                    //         DoorInfo = new Door()
+                    //         {
+                    //             index = cell.DoorIndex, DoorState = 0, ImageIndex = 0, LastTick = CMain.Time
+                    //         };
+                    //         Doors.Add(DoorInfo);
+                    //     }
+                    //     else
+                    //     {
+                    //         if (DoorInfo.DoorState != 0)
+                    //         {
+                    //             index += (DoorInfo.ImageIndex + 1) *
+                    //                      cell
+                    //                          .DoorOffset; //'bad' code if you want to use animation but it's gonna depend on the animation > has to be custom designed for the animtion
+                    //         }
+                    //     }
+                    // }
+
+                    Size s = Libraries.MapLibs[fileIndex].GetSize(index);
+                    if (s.Width == CellWidth && s.Height == CellHeight && animation == 0) continue;
+                    if ((s.Width == CellWidth * 2) && (s.Height == CellHeight * 2) && (animation == 0)) continue;
+                    MImage image = Libraries.MapLibs[fileIndex].GetImage(index);
+                    int drawX = ((x * CellWidth));
+                    int drawY = ((y * CellHeight));
+                    if (blend)
+                    {
+                        if (fileIndex == 14 || fileIndex == 27 || (fileIndex > 99 & fileIndex < 199))
+                            // 暂不支持的
+                            // Libraries.MapLibs[fileIndex].DrawBlend(index, new Point(drawX, drawY - (3 * CellHeight)),
+                            //     Color.White, true);
+                            DrawBlend();
+                        else
+                            // 暂不支持的
+                            // Libraries.MapLibs[fileIndex].DrawBlend(index, new Point(drawX, drawY - s.Height),
+                            //     Color.White, (index >= 2723 && index <= 2732));
+                            DrawBlend();
+                    }
+                    else
+                    {
+                        if (fileIndex == 28 && Libraries.MapLibs[fileIndex].GetOffSet(index) != Point.Empty)
+                            Draw(graphics, image, drawX, drawY - CellHeight, Color.White, true);
+                        else
+                            Draw(graphics, image, drawX, drawY - s.Height, Color.White, false);
                     }
                 }
             }
         }
+        
+        private static void DrawBlend()
+        {
+            Console.WriteLine("Drawing blend...暂不支持...............");
+        }
+        
+        private static void Draw(Graphics graphics, MImage image, int x, int y, Color color, bool offSet)
+        {
+
+            if (offSet)
+            {
+                x = x + image.X;
+                y = y + image.Y;
+            }
+            graphics.DrawImage(image.Image, x, y);
+            // DXManager.Draw(mi.Image, new Rectangle(0, 0, mi.Width, mi.Height), new Vector3((float)point.X, (float)point.Y, 0.0F), colour);
+            //
+            // mi.CleanTime = CMain.Time + Settings.CleanDelay;
+
+            // if (point.X >= Settings.ScreenWidth || point.Y >= Settings.ScreenHeight || point.X + mi.Width < 0 || point.Y + mi.Height < 0)
+            //     return;
+            //
+            // DXManager.Draw(mi.Image, new Rectangle(0, 0, mi.Width, mi.Height), new Vector3((float)point.X, (float)point.Y, 0.0F), colour);
+            //
+            // mi.CleanTime = CMain.Time + Settings.CleanDelay;
+        }
+        
     }
 }
