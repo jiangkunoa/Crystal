@@ -2,6 +2,34 @@ using System.Diagnostics;
 
 namespace MapImageExtractor
 {
+    public class CellInfo
+    {
+        public short BackIndex;
+        public int BackImage;
+        public short MiddleIndex;
+        public int MiddleImage;
+        public short FrontIndex;
+        public int FrontImage;
+
+        public byte DoorIndex;
+        public byte DoorOffset;
+
+        public byte FrontAnimationFrame;
+        public byte FrontAnimationTick;
+
+        public byte MiddleAnimationFrame;
+        public byte MiddleAnimationTick;
+
+        public short TileAnimationImage;
+        public short TileAnimationOffset;
+        public byte  TileAnimationFrames;
+
+        public byte Light;
+        public byte Unknown;
+
+        public bool FishingCell;
+    }
+
     public class MapReader
     {
         public int Width, Height;
@@ -16,6 +44,12 @@ namespace MapImageExtractor
             initiate();
         }
 
+        public string GetFileName()
+        {
+            FileInfo fi = new FileInfo(FileName);
+            return fi.Name;
+        }
+        
         private void initiate()
         {
             if (File.Exists(FileName))
