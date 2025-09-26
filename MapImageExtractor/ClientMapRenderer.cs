@@ -19,9 +19,28 @@ namespace MapImageExtractor
                 // Calculate map dimensions
                 int mapWidth = mapReader.Width * CellWidth;
                 int mapHeight = mapReader.Height * CellHeight;
+                Console.WriteLine($"Original dimensions: {mapWidth}x{mapHeight}");
+
+                // Check if dimensions are too large and scale down if necessary
+                int maxDimension = 20000; // Use a safer maximum dimension
+                float scale = 1.0f;
+                if (mapWidth > maxDimension || mapHeight > maxDimension)
+                {
+                    scale = Math.Min((float)maxDimension / mapWidth, (float)maxDimension / mapHeight);
+                    mapWidth = (int)(mapWidth * scale);
+                    mapHeight = (int)(mapHeight * scale);
+                    Console.WriteLine($"Map dimensions too large, scaling down by factor of {scale:F2}");
+                    Console.WriteLine($"New dimensions: {mapWidth}x{mapHeight}");
+                }
+                else
+                {
+                    Console.WriteLine($"Dimensions are within limits");
+                }
+
                 try
                 {
                     // Create bitmap with scaled dimensions
+                    Console.WriteLine($"Attempting to create bitmap with dimensions: {mapWidth}x{mapHeight}");
                     using (var fullMapBitmap = new Bitmap(mapWidth, mapHeight))
                     using (var graphics = Graphics.FromImage(fullMapBitmap))
                     {
@@ -302,6 +321,12 @@ namespace MapImageExtractor
                 Console.WriteLine($"Drawing offset image at {x}, {y}");
                 x += image.X;
                 y += image.Y;
+            }
+
+            if (image == null || image.Image == null)
+            {
+                Console.WriteLine($"Image is null at {x}, {y}");
+                return;
             }
             graphics.DrawImage(image.Image, x, y);
             // DXManager.Draw(mi.Image, new Rectangle(0, 0, mi.Width, mi.Height), new Vector3((float)point.X, (float)point.Y, 0.0F), colour);
